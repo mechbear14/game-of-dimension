@@ -43,6 +43,18 @@ function lerpRatio(a, min, max) {
   return (a - min) / (max - min);
 }
 
+function getLerp(min, max, r) {
+  return min + r * (max - min);
+}
+
+function getLerpPoint(p1, p2, r) {
+  let attrs = [];
+  for (let a = 0; a < p1.attr.length; a++) {
+    attrs.push(getLerp(p1.attr[a], p2.attr[a], r));
+  }
+  return new Point(2000, ...attrs);
+}
+
 class PointSystem {
   constructor(n) {
     this.nodes = [];
@@ -186,37 +198,41 @@ class Game {
     this.canvas.getContext("2d").fillRect(0, 0, canvas.width, canvas.height);
     this.render(this.loc, this.axis, this.viewRadius);
 
-    window.addEventListener("keypress", e => {
-      e.preventDefault();
-      switch (e.key) {
-        case "w":
-          this.changeDimUp();
-          break;
-        case "s":
-          this.changeDimDown();
-          break;
-        case "a":
-          this.traverseLeft();
-          break;
-        case "d":
-          this.traverseRight();
-          break;
-      }
-    });
+    window.addEventListener("keypress", this.onKeyPress);
+  }
+
+  onKeyPress(e) {
+    e.preventDefault();
+    switch (e.key) {
+      case "w":
+        game.changeDimUp();
+        break;
+      case "s":
+        game.changeDimDown();
+        break;
+      case "a":
+        game.traverseLeft();
+        break;
+      case "d":
+        game.traverseRight();
+        break;
+    }
   }
 
   traverseRight() {
     let index = this.system.visibleNodes.indexOf(this.loc);
     if (index < this.system.visibleNodes.length - 1) {
-      this.loc = this.system.visibleNodes[index + 1];
-      this.render(this.loc, this.axis, this.viewRadius);
+      this.glideTo(this.system.visibleNodes[index + 1]);
+      // this.loc = this.system.visibleNodes[index + 1];
+      // this.render(this.loc, this.axis, this.viewRadius);
     }
   }
   traverseLeft() {
     let index = this.system.visibleNodes.indexOf(this.loc);
     if (index > 0) {
-      this.loc = this.system.visibleNodes[index - 1];
-      this.render(this.loc, this.axis, this.viewRadius);
+      this.glideTo(this.system.visibleNodes[index - 1]);
+      // this.loc = this.system.visibleNodes[index - 1];
+      // this.render(this.loc, this.axis, this.viewRadius);
     }
   }
   changeDimUp() {
@@ -228,6 +244,23 @@ class Game {
     this.axis = (this.axis + 3 - 1) % 3;
     this.system.getVisibleLinks(this.loc, this.axis, this.radius);
     this.render(this.loc, this.axis, this.viewRadius);
+  }
+
+  glideTo(loc) {
+    window.removeEventListener("keypress", this.onKeyPress);
+    for (let tn = 1; tn < 11; tn++) {
+      let t = 50 * tn;
+      let r = 0.1 * tn;
+      let p = getLerpPoint(this.loc, loc, r);
+      window.setTimeout(() => {
+        this.render(p, this.axis, this.viewRadius);
+      }, t);
+    }
+    window.setTimeout(
+      window.addEventListener("keypress", this.onKeyPress),
+      500
+    );
+    this.loc = loc;
   }
 
   render(loc, axis, radius) {
@@ -248,18 +281,22 @@ class Game {
         pointsInView.indexOf(link.source) > -1 ||
         pointsInView.indexOf(link.target) > -1
     );
-    linksInView.forEach(link => {
-      let sr = lerpRatio(link.source.attr[axis], lower, upper);
-      let tr = lerpRatio(link.target.attr[axis], lower, upper);
-      link.render(
-        this.canvas,
-        sr + 20 / width,
-        0.5,
-        tr - 20 / width,
-        0.5,
-        axis
-      );
-    });
+    if (linksInView.length == 0) {
+      new Link(0, 0).render(this.canvas, 0, 0.5, 1, 0.5, axis);
+    } else {
+      linksInView.forEach(link => {
+        let sr = lerpRatio(link.source.attr[axis], lower, upper);
+        let tr = lerpRatio(link.target.attr[axis], lower, upper);
+        link.render(
+          this.canvas,
+          sr + 20 / width,
+          0.5,
+          tr - 20 / width,
+          0.5,
+          axis
+        );
+      });
+    }
     pointsInView.forEach(point => {
       let r = lerpRatio(point.attr[axis], lower, upper);
       point.render(this.canvas, r, 0.5, axis);
