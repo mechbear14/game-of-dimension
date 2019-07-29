@@ -82,7 +82,7 @@ class PointSystem {
         this.visibleNodes.push(visibleCandidates[i]);
       } else {
         if (
-          ds(this.visibleNodes.last(), viewNode) <
+          ds(this.visibleNodes.last(), viewNode) >=
           ds(visibleCandidates[i], viewNode)
         ) {
           this.visibleNodes.pop();
@@ -123,10 +123,13 @@ class Point {
     let c = canvas.getContext("2d");
     c.beginPath();
     c.arc(renderX, renderY, 20, 0, Math.PI * 2, false);
-    c.fillStyle = "#ffffff";
     c.strokeStyle = COLOURS[axis];
-    c.lineWidth = 5;
-    c.fill();
+    c.lineWidth = 20;
+    c.filter = "blur(10px)";
+    c.stroke();
+    c.strokeStyle = "#ffffff";
+    c.lineWidth = 8;
+    c.filter = "blur(0px)";
     c.stroke();
     c.closePath();
     c.fillStyle = COLOURS[axis];
@@ -153,7 +156,14 @@ class Link {
     c.moveTo(sourceX, sourceY);
     c.lineTo(targetX, targetY);
     c.strokeStyle = COLOURS[axis];
-    c.lineWidth = 5;
+    c.lineWidth = 20;
+    c.filter = "blur(10px)";
+    c.stroke();
+    c.moveTo(sourceX, sourceY);
+    c.lineTo(targetX, targetY);
+    c.strokeStyle = "#ffffff";
+    c.lineWidth = 8;
+    c.filter = "blur(0px)";
     c.stroke();
     c.closePath();
   }
@@ -171,12 +181,12 @@ class Game {
     this.axis = X;
     this.system.getVisibleLinks(this.loc, this.axis, this.radius);
 
-    this.viewRadius = 5;
+    this.viewRadius = 4.5;
     this.canvas = canvas;
+    this.canvas.getContext("2d").fillRect(0, 0, canvas.width, canvas.height);
     this.render(this.loc, this.axis, this.viewRadius);
 
     window.addEventListener("keypress", e => {
-      console.log(this.loc.attr);
       e.preventDefault();
       switch (e.key) {
         case "w":
@@ -221,8 +231,11 @@ class Game {
   }
 
   render(loc, axis, radius) {
+    let width = canvas.width;
+    let height = canvas.height;
     let c = this.canvas.getContext("2d");
-    c.clearRect(0, 270 - 20 - 5, 960, 20 + 5 + 20 + 5);
+    c.fillStyle = "#000000";
+    c.fillRect(0, 200, 960, 140);
     let pointsInView = [];
     let linksInView = [];
     let lower = loc.attr[axis] - radius;
@@ -238,7 +251,14 @@ class Game {
     linksInView.forEach(link => {
       let sr = lerpRatio(link.source.attr[axis], lower, upper);
       let tr = lerpRatio(link.target.attr[axis], lower, upper);
-      link.render(this.canvas, sr, 0.5, tr, 0.5, axis);
+      link.render(
+        this.canvas,
+        sr + 20 / width,
+        0.5,
+        tr - 20 / width,
+        0.5,
+        axis
+      );
     });
     pointsInView.forEach(point => {
       let r = lerpRatio(point.attr[axis], lower, upper);
