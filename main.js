@@ -1,17 +1,35 @@
+const X = 0;
+const Y = 1;
+const Z = 2;
+
+function ds(p1, p2) {
+  let dx = p1.a - p2.a;
+  let dy = p1.b - p2.b;
+  let dz = p1.c - p2.c;
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+function randIntBetween(a, b) {
+  let coef = Math.random();
+  return Math.round(a * coef + b * (1 - coef));
+}
+
 class PointSystem {
   constructor(n) {
     this.nodes = [];
     this.links = [];
+    this.visibleNodes = [];
+    this.visibleLinks = [];
     for (let i = 0; i < n; i++) {
       let newPoint = new Point(
         i,
-        this.randIntBetween(0, 200),
-        this.randIntBetween(0, 200),
-        this.randIntBetween(0, 200)
+        randIntBetween(0, 200),
+        randIntBetween(0, 200),
+        randIntBetween(0, 200)
       );
       this.nodes.push(newPoint);
     }
-
+    /*
     let a = this.nodes.slice();
     a.sort((pa, pb) => {
       return pa.a - pb.a;
@@ -30,11 +48,35 @@ class PointSystem {
       this.links.push({ source: b[i], target: b[i + 1], stroke: "#0080ff" });
       this.links.push({ source: c[i], target: c[i + 1], stroke: "#008000" });
     }
+    */
   }
 
-  randIntBetween(a, b) {
-    let coef = Math.random();
-    return Math.round(a * coef + b * (1 - coef));
+  getVisibleLinks(viewNode, dimension, width) {
+    this.visibleNodes = this.nodes.filter(node => ds(viewNode, node) < width);
+    let arr = this.visibleNodes.slice();
+    switch (dimension) {
+      case X:
+        arr.sort((a, b) => a.a < b.a);
+        break;
+      case Y:
+        arr.sort((a, b) => a.b < b.b);
+        break;
+      case Z:
+        arr.sort((a, b) => a.c < b.c);
+        break;
+    }
+    for (let i = 0; i < arr.length - 1; i++) {
+      this.visibleLinks.push({ source: arr[i], target: arr[i + 1] });
+    }
+  }
+
+  getRandomPoint() {
+    let index = Math.round(Math.random() * this.nodes.length);
+    return this.nodes[index];
+  }
+
+  setBeacon(point) {
+    point.beacon = true;
   }
 }
 
@@ -49,50 +91,14 @@ class Point {
   }
 }
 
-const WIDTH = 1920;
-const HEIGHT = 1080;
-
-system = new PointSystem(85);
-console.log(system.nodes);
-simulation = d3
-  .forceSimulation(system.nodes)
-  .force("charge", d3.forceManyBody().strength(-270))
-  .force("center", d3.forceCenter(WIDTH / 2, HEIGHT / 2))
-  .force(
-    "link",
-    d3
-      .forceLink()
-      .links(system.links)
-      .distance(10)
-  )
-  .on("tick", render);
-
-function render() {
-  let l = d3
-    .select("svg")
-    .selectAll("line")
-    .data(system.links);
-  l.enter()
-    .append("line")
-    .merge(l)
-    .attr("x1", d => d.source.x)
-    .attr("x2", d => d.target.x)
-    .attr("y1", d => d.source.y)
-    .attr("y2", d => d.target.y)
-    .attr("stroke", d => d.stroke);
-
-  l.exit().remove();
-
-  let n = d3
-    .select("svg")
-    .selectAll("circle")
-    .data(system.nodes);
-  n.enter()
-    .append("circle")
-    .merge(n)
-    .attr("r", 5)
-    .attr("cx", d => d.x)
-    .attr("cy", d => d.y);
-
-  n.exit().remove();
+system = new PointSystem(200);
+system.setBeacon(system.getRandomPoint());
+location = system.getRandomPoint();
+while (location.beacon) {
+  location = system.getRandomPoint();
 }
+system.getVisibleLinks(location);
+console.log(location);
+console.log(beacon);
+console.log(system.visibleNodes);
+console.log(system.visibleLinks);
