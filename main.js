@@ -2,8 +2,6 @@ const X = 0;
 const Y = 1;
 const Z = 2;
 const COLOURS = ["#800080", "#ff8000", "#008000"];
-// TODO: Refactor so that functions are property name and dimension count independent
-// TODO: Name: "axis" or "dimension"?
 
 Array.prototype.last = function() {
   return this[this.length - 1];
@@ -223,16 +221,12 @@ class Game {
     let index = this.system.visibleNodes.indexOf(this.loc);
     if (index < this.system.visibleNodes.length - 1) {
       this.glideTo(this.system.visibleNodes[index + 1]);
-      // this.loc = this.system.visibleNodes[index + 1];
-      // this.render(this.loc, this.axis, this.viewRadius);
     }
   }
   traverseLeft() {
     let index = this.system.visibleNodes.indexOf(this.loc);
     if (index > 0) {
       this.glideTo(this.system.visibleNodes[index - 1]);
-      // this.loc = this.system.visibleNodes[index - 1];
-      // this.render(this.loc, this.axis, this.viewRadius);
     }
   }
   changeDimUp() {
