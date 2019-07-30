@@ -122,7 +122,13 @@ class Point {
   constructor(id, a, b, c) {
     this.id = id;
     this.attr = [a, b, c];
+    this.flatAttr = [0, 0];
     this.beacon = false;
+  }
+
+  setFlatAttr(x, y) {
+    this.flatAttr[0] = x;
+    this.flatAttr[1] = y;
   }
 
   render(canvas, x, y, axis) {
@@ -149,9 +155,10 @@ class Point {
 }
 
 class Link {
-  constructor(sourceId, targetId) {
+  constructor(sourceId, targetId, axis) {
     this.source = sourceId;
     this.target = targetId;
+    this.axis = axis;
   }
 
   render(canvas, sx, sy, tx, ty, axis) {
@@ -193,8 +200,8 @@ class Game {
 
     this.viewRadius = 4.5;
     this.canvas = canvas;
-    this.canvas.getContext("2d").fillRect(0, 0, canvas.width, canvas.height);
-    this.render(this.loc, this.axis, this.viewRadius);
+    //this.canvas.getContext("2d").fillRect(0, 0, canvas.width, canvas.height);
+    //this.render(this.loc, this.axis, this.viewRadius);
 
     window.addEventListener("keypress", this.onKeyPress);
   }
@@ -298,4 +305,142 @@ class Game {
   }
 }
 
-let game = new Game(200, document.getElementById("canvas"));
+// let game = new Game(200, document.getElementById("canvas"));
+// TODO: Move generating points outside point system
+let system = new PointSystem(200);
+let simNodes = system.nodes.map(() => {
+  return {};
+});
+let simLinks = [];
+system.routes.forEach((route, index) => {
+  for (let r = 0; r < route.length - 1; r++) {
+    simLinks.push({
+      source: route[r].id,
+      target: route[r + 1].id,
+      route: index
+    });
+  }
+});
+console.log(simNodes);
+console.log(simLinks);
+
+const WIDTH = 3000;
+const HEIGHT = 3000;
+const VIEW_WIDTH = 320;
+const VIEW_HEIGHT = 180;
+let loc = system.getRandomPoint();
+let axis = X;
+let visibleLinks = [];
+let canvas = document.getElementById("canvas");
+let c = canvas.getContext("2d");
+c.fillStyle = "#000000";
+c.fillRect(0, 0, canvas.width, canvas.height);
+
+let simulation = d3
+  .forceSimulation(simNodes)
+  .force("charge", d3.forceManyBody().strength(-1000))
+  .force("center", d3.forceCenter(WIDTH / 2, HEIGHT / 2))
+  .force("link", d3.forceLink().links(simLinks))
+  .on("tick", update)
+  .on("end", end);
+
+function update() {
+  let points = d3
+    .select("svg")
+    .selectAll("circle")
+    .data(simNodes);
+  points
+    .enter()
+    .append("circle")
+    .merge(points)
+    .attr("r", 10)
+    .attr("cx", d => d.x)
+    .attr("cy", d => d.y)
+    .attr("fill", "#000000");
+  points.exit().remove();
+
+  let links = d3
+    .select("svg")
+    .selectAll("line")
+    .data(simLinks);
+  links
+    .enter()
+    .append("line")
+    .merge(links)
+    .attr("x1", d => d.source.x)
+    .attr("y1", d => d.source.y)
+    .attr("x2", d => d.target.x)
+    .attr("y2", d => d.target.y)
+    .attr("stroke", d => {
+      switch (d.route) {
+        case 0:
+          return "#800080";
+        case 1:
+          return "#ff8000";
+        case 2:
+          return "#008000";
+        default:
+          throw new Error("Invalid route");
+      }
+    });
+  links.exit().remove();
+}
+
+function end() {
+  for (let node of simNodes) {
+    system.nodes[node.index].setFlatAttr(node.x, node.y);
+  }
+  for (let link of simLinks) {
+    system.links[link.index] = new Link(
+      link.source.index,
+      link.target.index,
+      link.route
+    );
+  }
+  let body = document.getElementsByTagName("body")[0];
+  body.removeChild(document.querySelector("svg"));
+  getVisibleLinks(loc, axis);
+  renderRegion(loc.flatAttr[0], loc.flatAttr[1], VIEW_WIDTH, VIEW_HEIGHT);
+}
+
+function getVisibleLinks(viewNode, dimension) {
+  visibleLinks = system.links.filter(
+    link =>
+      link.axis === dimension ||
+      link.source === viewNode.id ||
+      link.target === viewNode.id
+  );
+}
+
+function renderRegion(x, y, w, h) {
+  let bBox = [x - w / 2, y - h / 2, x + w / 2, y + h / 2];
+  let pointsInView = system.nodes.filter(
+    node =>
+      node.flatAttr[0] > bBox[0] &&
+      node.flatAttr[0] < bBox[2] &&
+      node.flatAttr[1] > bBox[1] &&
+      node.flatAttr[1] < bBox[3]
+  );
+  let linksInView = visibleLinks.filter(link => {
+    let s = system.nodes[link.source].flatAttr;
+    let t = system.nodes[link.target].flatAttr;
+    return (
+      (s[0] > bBox[0] && s[0] < bBox[2] && s[1] > bBox[1] && s[1] < bBox[3]) ||
+      (t[0] > bBox[0] && t[0] < bBox[2] && t[1] > bBox[1] && t[1] < bBox[3])
+    );
+  });
+  for (let link of linksInView) {
+    let s = system.nodes[link.source].flatAttr;
+    let t = system.nodes[link.target].flatAttr;
+    let x1 = lerpRatio(s[0], bBox[0], bBox[2]);
+    let y1 = lerpRatio(s[1], bBox[1], bBox[3]);
+    let x2 = lerpRatio(t[0], bBox[0], bBox[2]);
+    let y2 = lerpRatio(t[1], bBox[1], bBox[3]);
+    link.render(canvas, x1, y1, x2, y2, link.axis);
+  }
+  for (let point of pointsInView) {
+    let x = lerpRatio(point.flatAttr[0], bBox[0], bBox[2]);
+    let y = lerpRatio(point.flatAttr[1], bBox[1], bBox[3]);
+    point.render(canvas, x, y, axis);
+  }
+}
