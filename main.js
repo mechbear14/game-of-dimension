@@ -139,6 +139,8 @@ class Point {
     let c = canvas.getContext("2d");
     c.beginPath();
     c.arc(renderX, renderY, 20, 0, Math.PI * 2, false);
+    c.fillStyle = "#000000";
+    c.fill();
     c.strokeStyle = COLOURS[axis];
     c.lineWidth = 20;
     c.filter = "blur(10px)";
